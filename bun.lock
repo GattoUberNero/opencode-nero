@@ -262,7 +262,7 @@
     },
     "packages/opencode": {
       "name": "opencode",
-      "version": "1.2.7-n",
+      "version": "1.2.7-nero.1",
       "bin": {
         "opencode": "./bin/opencode",
       },
