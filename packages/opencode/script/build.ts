@@ -14,6 +14,7 @@ process.chdir(dir)
 
 import pkg from "../package.json"
 import { Script } from "@opencode-ai/script"
+const buildVersion = process.env.OPENCODE_VERSION || pkg.version
 const modelsUrl = process.env.OPENCODE_MODELS_URL || "https://models.dev"
 // Fetch and generate models.dev snapshot
 const modelsData = process.env.MODELS_DEV_API_JSON
@@ -176,12 +177,12 @@ for (const item of targets) {
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
       outfile: `dist/${name}/bin/opencode`,
-      execArgv: [`--user-agent=opencode/${Script.version}`, "--use-system-ca", "--"],
+      execArgv: [`--user-agent=opencode/${buildVersion}`, "--use-system-ca", "--"],
       windows: {},
     },
     entrypoints: ["./src/index.ts", parserWorker, workerPath],
     define: {
-      OPENCODE_VERSION: `'${Script.version}'`,
+      OPENCODE_VERSION: `'${buildVersion}'`,
       OPENCODE_MIGRATIONS: JSON.stringify(migrations),
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       OPENCODE_WORKER_PATH: workerPath,
@@ -195,7 +196,7 @@ for (const item of targets) {
     JSON.stringify(
       {
         name,
-        version: Script.version,
+        version: buildVersion,
         os: [item.os],
         cpu: [item.arch],
       },
@@ -203,7 +204,7 @@ for (const item of targets) {
       2,
     ),
   )
-  binaries[name] = Script.version
+  binaries[name] = buildVersion
 }
 
 if (false) {
@@ -214,7 +215,7 @@ if (false) {
       await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
     }
   }
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber`
+  await $`gh release upload v${buildVersion} ./dist/*.zip ./dist/*.tar.gz --clobber`
 }
 
 export { binaries }
