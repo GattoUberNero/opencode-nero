@@ -112,23 +112,22 @@ export function tui(input: {
 }) {
 	// promise to prevent immediate exit
 	return new Promise<void>(async (resolve) => {
-
-		// --- MOUSE TRACKING HACK ---
-		// Prevent @opentui from enabling terminal mouse tracking so the host terminal
-		// (like tmux) can perform native text selection instead.
-		const originalWrite = process.stdout.write.bind(process.stdout);
-		(process.stdout as any).write = function (chunk: any, encoding?: any, callback?: any) {
-			if (typeof chunk === 'string') {
-				chunk = chunk.replace(/\x1b\[\?(1000|1002|1003|1006|1015)h/g, '');
-			} else if (Buffer.isBuffer(chunk)) {
-				const str = chunk.toString();
-				if (str.includes('\\x1b[?100') || str.includes('\x1b[?100')) {
-					chunk = Buffer.from(str.replace(/\x1b\[\?(1000|1002|1003|1006|1015)h/g, ''));
+		let restoreStdoutWrite: (() => void) | undefined
+		if (process.env.OPENCODE_DISABLE_MOUSE_TRACKING === "1") {
+			const originalWrite = process.stdout.write.bind(process.stdout)
+			;(process.stdout as any).write = function (chunk: any, encoding?: any, callback?: any) {
+				if (typeof chunk === "string") {
+					chunk = chunk.replace(/\x1b\[\?(1000|1002|1003|1006|1015)h/g, "")
+				} else if (Buffer.isBuffer(chunk)) {
+					const str = chunk.toString()
+					chunk = Buffer.from(str.replace(/\x1b\[\?(1000|1002|1003|1006|1015)h/g, ""))
 				}
+				return originalWrite(chunk, encoding, callback)
 			}
-			return originalWrite(chunk, encoding, callback);
-		};
-		// ---------------------------
+			restoreStdoutWrite = () => {
+				;(process.stdout as any).write = originalWrite
+			}
+		}
 
 		const unguard = win32InstallCtrlCGuard()
 		win32DisableProcessedInput()
@@ -140,6 +139,7 @@ export function tui(input: {
 		win32DisableProcessedInput()
 
 		const onExit = async () => {
+			restoreStdoutWrite?.()
 			unguard?.()
 			await input.onExit?.()
 			resolve()
