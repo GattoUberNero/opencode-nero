@@ -1,0 +1,2784 @@
+diff --git a/bun.lock b/bun.lock
+index e87f700f0..5ca095604 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -262,7 +262,7 @@
+     },
+     "packages/opencode": {
+       "name": "opencode",
+-      "version": "1.2.7",
++      "version": "1.2.7-n",
+       "bin": {
+         "opencode": "./bin/opencode",
+       },
+diff --git a/packages/app/src/components/terminal.tsx b/packages/app/src/components/terminal.tsx
+index bd7ab2447..058651dd3 100644
+--- a/packages/app/src/components/terminal.tsx
++++ b/packages/app/src/components/terminal.tsx
+@@ -16,559 +16,577 @@ import { terminalWriter } from "@/utils/terminal-writer"
+ const TOGGLE_TERMINAL_ID = "terminal.toggle"
+ const DEFAULT_TOGGLE_TERMINAL_KEYBIND = "ctrl+`"
+ export interface TerminalProps extends ComponentProps<"div"> {
+-  pty: LocalPTY
+-  onSubmit?: () => void
+-  onCleanup?: (pty: LocalPTY) => void
+-  onConnect?: () => void
+-  onConnectError?: (error: unknown) => void
++	pty: LocalPTY
++	onSubmit?: () => void
++	onCleanup?: (pty: LocalPTY) => void
++	onConnect?: () => void
++	onConnectError?: (error: unknown) => void
+ }
+ 
+ let shared: Promise<{ mod: typeof import("ghostty-web"); ghostty: Ghostty }> | undefined
+ 
+ const loadGhostty = () => {
+-  if (shared) return shared
+-  shared = import("ghostty-web")
+-    .then(async (mod) => ({ mod, ghostty: await mod.Ghostty.load() }))
+-    .catch((err) => {
+-      shared = undefined
+-      throw err
+-    })
+-  return shared
++	if (shared) return shared
++	shared = import("ghostty-web")
++		.then(async (mod) => ({ mod, ghostty: await mod.Ghostty.load() }))
++		.catch((err) => {
++			shared = undefined
++			throw err
++		})
++	return shared
+ }
+ 
+ type TerminalColors = {
+-  background: string
+-  foreground: string
+-  cursor: string
+-  selectionBackground: string
++	background: string
++	foreground: string
++	cursor: string
++	selectionBackground: string
+ }
+ 
+ const DEFAULT_TERMINAL_COLORS: Record<"light" | "dark", TerminalColors> = {
+-  light: {
+-    background: "#fcfcfc",
+-    foreground: "#211e1e",
+-    cursor: "#211e1e",
+-    selectionBackground: withAlpha("#211e1e", 0.2),
+-  },
+-  dark: {
+-    background: "#191515",
+-    foreground: "#d4d4d4",
+-    cursor: "#d4d4d4",
+-    selectionBackground: withAlpha("#d4d4d4", 0.25),
+-  },
++	light: {
++		background: "#fcfcfc",
++		foreground: "#211e1e",
++		cursor: "#211e1e",
++		selectionBackground: withAlpha("#211e1e", 0.2),
++	},
++	dark: {
++		background: "#191515",
++		foreground: "#d4d4d4",
++		cursor: "#d4d4d4",
++		selectionBackground: withAlpha("#d4d4d4", 0.25),
++	},
+ }
+ 
+ const debugTerminal = (...values: unknown[]) => {
+-  if (!import.meta.env.DEV) return
+-  console.debug("[terminal]", ...values)
++	if (!import.meta.env.DEV) return
++	console.debug("[terminal]", ...values)
+ }
+ 
+ const useTerminalUiBindings = (input: {
+-  container: HTMLDivElement
+-  term: Term
+-  cleanups: VoidFunction[]
+-  handlePointerDown: () => void
+-  handleLinkClick: (event: MouseEvent) => void
++	container: HTMLDivElement
++	term: Term
++	cleanups: VoidFunction[]
++	handlePointerDown: () => void
++	handleLinkClick: (event: MouseEvent) => void
+ }) => {
+-  const handleCopy = (event: ClipboardEvent) => {
+-    const selection = input.term.getSelection()
+-    if (!selection) return
+-
+-    const clipboard = event.clipboardData
+-    if (!clipboard) return
+-
+-    event.preventDefault()
+-    clipboard.setData("text/plain", selection)
+-  }
+-
+-  const handlePaste = (event: ClipboardEvent) => {
+-    const clipboard = event.clipboardData
+-    const text = clipboard?.getData("text/plain") ?? clipboard?.getData("text") ?? ""
+-    if (!text) return
+-
+-    event.preventDefault()
+-    event.stopPropagation()
+-    input.term.paste(text)
+-  }
+-
+-  const handleTextareaFocus = () => {
+-    input.term.options.cursorBlink = true
+-  }
+-  const handleTextareaBlur = () => {
+-    input.term.options.cursorBlink = false
+-  }
+-
+-  input.container.addEventListener("copy", handleCopy, true)
+-  input.cleanups.push(() => input.container.removeEventListener("copy", handleCopy, true))
+-
+-  input.container.addEventListener("paste", handlePaste, true)
+-  input.cleanups.push(() => input.container.removeEventListener("paste", handlePaste, true))
+-
+-  input.container.addEventListener("pointerdown", input.handlePointerDown)
+-  input.cleanups.push(() => input.container.removeEventListener("pointerdown", input.handlePointerDown))
+-
+-  input.container.addEventListener("click", input.handleLinkClick, {
+-    capture: true,
+-  })
+-  input.cleanups.push(() =>
+-    input.container.removeEventListener("click", input.handleLinkClick, {
+-      capture: true,
+-    }),
+-  )
+-
+-  input.term.textarea?.addEventListener("focus", handleTextareaFocus)
+-  input.term.textarea?.addEventListener("blur", handleTextareaBlur)
+-  input.cleanups.push(() => input.term.textarea?.removeEventListener("focus", handleTextareaFocus))
+-  input.cleanups.push(() => input.term.textarea?.removeEventListener("blur", handleTextareaBlur))
++	const handleCopy = (event: ClipboardEvent) => {
++		const selection = input.term.getSelection()
++		if (!selection) return
++
++		const clipboard = event.clipboardData
++		if (!clipboard) return
++
++		event.preventDefault()
++		clipboard.setData("text/plain", selection)
++	}
++
++	const handlePaste = (event: ClipboardEvent) => {
++		const clipboard = event.clipboardData
++		const text = clipboard?.getData("text/plain") ?? clipboard?.getData("text") ?? ""
++		if (!text) return
++
++		event.preventDefault()
++		event.stopPropagation()
++		input.term.paste(text)
++	}
++
++	const handleTextareaFocus = () => {
++		input.term.options.cursorBlink = true
++	}
++	const handleTextareaBlur = () => {
++		input.term.options.cursorBlink = false
++	}
++
++	input.container.addEventListener("copy", handleCopy, true)
++	input.cleanups.push(() => input.container.removeEventListener("copy", handleCopy, true))
++
++	input.container.addEventListener("paste", handlePaste, true)
++	input.cleanups.push(() => input.container.removeEventListener("paste", handlePaste, true))
++
++	input.container.addEventListener("pointerdown", input.handlePointerDown)
++	input.cleanups.push(() => input.container.removeEventListener("pointerdown", input.handlePointerDown))
++
++	input.container.addEventListener("click", input.handleLinkClick, {
++		capture: true,
++	})
++	input.cleanups.push(() =>
++		input.container.removeEventListener("click", input.handleLinkClick, {
++			capture: true,
++		}),
++	)
++
++	input.term.textarea?.addEventListener("focus", handleTextareaFocus)
++	input.term.textarea?.addEventListener("blur", handleTextareaBlur)
++	input.cleanups.push(() => input.term.textarea?.removeEventListener("focus", handleTextareaFocus))
++	input.cleanups.push(() => input.term.textarea?.removeEventListener("blur", handleTextareaBlur))
+ }
+ 
+ const persistTerminal = (input: {
+-  term: Term | undefined
+-  addon: SerializeAddon | undefined
+-  cursor: number
+-  pty: LocalPTY
+-  onCleanup?: (pty: LocalPTY) => void
++	term: Term | undefined
++	addon: SerializeAddon | undefined
++	cursor: number
++	pty: LocalPTY
++	onCleanup?: (pty: LocalPTY) => void
+ }) => {
+-  if (!input.addon || !input.onCleanup || !input.term) return
+-  const buffer = (() => {
+-    try {
+-      return input.addon.serialize()
+-    } catch {
+-      debugTerminal("failed to serialize terminal buffer")
+-      return ""
+-    }
+-  })()
+-
+-  input.onCleanup({
+-    ...input.pty,
+-    buffer,
+-    cursor: input.cursor,
+-    rows: input.term.rows,
+-    cols: input.term.cols,
+-    scrollY: input.term.getViewportY(),
+-  })
++	if (!input.addon || !input.onCleanup || !input.term) return
++	const buffer = (() => {
++		try {
++			return input.addon.serialize()
++		} catch {
++			debugTerminal("failed to serialize terminal buffer")
++			return ""
++		}
++	})()
++
++	input.onCleanup({
++		...input.pty,
++		buffer,
++		cursor: input.cursor,
++		rows: input.term.rows,
++		cols: input.term.cols,
++		scrollY: input.term.getViewportY(),
++	})
+ }
+ 
+ export const Terminal = (props: TerminalProps) => {
+-  const platform = usePlatform()
+-  const sdk = useSDK()
+-  const settings = useSettings()
+-  const theme = useTheme()
+-  const language = useLanguage()
+-  const server = useServer()
+-  let container!: HTMLDivElement
+-  const [local, others] = splitProps(props, ["pty", "class", "classList", "onConnect", "onConnectError"])
+-  let ws: WebSocket | undefined
+-  let term: Term | undefined
+-  let ghostty: Ghostty
+-  let serializeAddon: SerializeAddon
+-  let fitAddon: FitAddon
+-  let handleResize: () => void
+-  let fitFrame: number | undefined
+-  let sizeTimer: ReturnType<typeof setTimeout> | undefined
+-  let pendingSize: { cols: number; rows: number } | undefined
+-  let lastSize: { cols: number; rows: number } | undefined
+-  let disposed = false
+-  const cleanups: VoidFunction[] = []
+-  const start =
+-    typeof local.pty.cursor === "number" && Number.isSafeInteger(local.pty.cursor) ? local.pty.cursor : undefined
+-  let cursor = start ?? 0
+-  let output: ReturnType<typeof terminalWriter> | undefined
+-
+-  const cleanup = () => {
+-    if (!cleanups.length) return
+-    const fns = cleanups.splice(0).reverse()
+-    for (const fn of fns) {
+-      try {
+-        fn()
+-      } catch (err) {
+-        debugTerminal("cleanup failed", err)
+-      }
+-    }
+-  }
+-
+-  const pushSize = (cols: number, rows: number) => {
+-    return sdk.client.pty
+-      .update({
+-        ptyID: local.pty.id,
+-        size: { cols, rows },
+-      })
+-      .catch((err) => {
+-        debugTerminal("failed to sync terminal size", err)
+-      })
+-  }
+-
+-  const getTerminalColors = (): TerminalColors => {
+-    const mode = theme.mode() === "dark" ? "dark" : "light"
+-    const fallback = DEFAULT_TERMINAL_COLORS[mode]
+-    const currentTheme = theme.themes()[theme.themeId()]
+-    if (!currentTheme) return fallback
+-    const variant = mode === "dark" ? currentTheme.dark : currentTheme.light
+-    if (!variant?.seeds) return fallback
+-    const resolved = resolveThemeVariant(variant, mode === "dark")
+-    const text = resolved["text-stronger"] ?? fallback.foreground
+-    const background = resolved["background-stronger"] ?? fallback.background
+-    const alpha = mode === "dark" ? 0.25 : 0.2
+-    const base = text.startsWith("#") ? (text as HexColor) : (fallback.foreground as HexColor)
+-    const selectionBackground = withAlpha(base, alpha)
+-    return {
+-      background,
+-      foreground: text,
+-      cursor: text,
+-      selectionBackground,
+-    }
+-  }
+-
+-  const [terminalColors, setTerminalColors] = createSignal<TerminalColors>(getTerminalColors())
+-
+-  const scheduleFit = () => {
+-    if (disposed) return
+-    if (!fitAddon) return
+-    if (fitFrame !== undefined) return
+-
+-    fitFrame = requestAnimationFrame(() => {
+-      fitFrame = undefined
+-      if (disposed) return
+-      fitAddon.fit()
+-    })
+-  }
+-
+-  const scheduleSize = (cols: number, rows: number) => {
+-    if (disposed) return
+-    if (lastSize?.cols === cols && lastSize?.rows === rows) return
+-
+-    pendingSize = { cols, rows }
+-
+-    if (!lastSize) {
+-      lastSize = pendingSize
+-      void pushSize(cols, rows)
+-      return
+-    }
+-
+-    if (sizeTimer !== undefined) return
+-    sizeTimer = setTimeout(() => {
+-      sizeTimer = undefined
+-      const next = pendingSize
+-      if (!next) return
+-      pendingSize = undefined
+-      if (disposed) return
+-      if (lastSize?.cols === next.cols && lastSize?.rows === next.rows) return
+-      lastSize = next
+-      void pushSize(next.cols, next.rows)
+-    }, 100)
+-  }
+-
+-  createEffect(() => {
+-    const colors = getTerminalColors()
+-    setTerminalColors(colors)
+-    if (!term) return
+-    setOptionIfSupported(term, "theme", colors)
+-  })
+-
+-  createEffect(() => {
+-    const font = monoFontFamily(settings.appearance.font())
+-    if (!term) return
+-    setOptionIfSupported(term, "fontFamily", font)
+-    scheduleFit()
+-  })
+-
+-  let zoom = platform.webviewZoom?.()
+-  createEffect(() => {
+-    const next = platform.webviewZoom?.()
+-    if (next === undefined) return
+-    if (next === zoom) return
+-    zoom = next
+-    scheduleFit()
+-  })
+-
+-  const focusTerminal = () => {
+-    const t = term
+-    if (!t) return
+-    t.focus()
+-    t.textarea?.focus()
+-    setTimeout(() => t.textarea?.focus(), 0)
+-  }
+-  const handlePointerDown = () => {
+-    const activeElement = document.activeElement
+-    if (activeElement instanceof HTMLElement && activeElement !== container && !container.contains(activeElement)) {
+-      activeElement.blur()
+-    }
+-    focusTerminal()
+-  }
+-
+-  const handleLinkClick = (event: MouseEvent) => {
+-    if (!event.shiftKey && !event.ctrlKey && !event.metaKey) return
+-    if (event.altKey) return
+-    if (event.button !== 0) return
+-
+-    const t = term
+-    if (!t) return
+-
+-    const text = getHoveredLinkText(t)
+-    if (!text) return
+-
+-    event.preventDefault()
+-    event.stopImmediatePropagation()
+-    platform.openLink(text)
+-  }
+-
+-  onMount(() => {
+-    const run = async () => {
+-      const loaded = await loadGhostty()
+-      if (disposed) return
+-
+-      const mod = loaded.mod
+-      const g = loaded.ghostty
+-
+-      const restore = typeof local.pty.buffer === "string" ? local.pty.buffer : ""
+-      const restoreSize =
+-        restore &&
+-        typeof local.pty.cols === "number" &&
+-        Number.isSafeInteger(local.pty.cols) &&
+-        local.pty.cols > 0 &&
+-        typeof local.pty.rows === "number" &&
+-        Number.isSafeInteger(local.pty.rows) &&
+-        local.pty.rows > 0
+-          ? { cols: local.pty.cols, rows: local.pty.rows }
+-          : undefined
+-
+-      const t = new mod.Terminal({
+-        cursorBlink: true,
+-        cursorStyle: "bar",
+-        cols: restoreSize?.cols,
+-        rows: restoreSize?.rows,
+-        fontSize: 14,
+-        fontFamily: monoFontFamily(settings.appearance.font()),
+-        allowTransparency: false,
+-        convertEol: false,
+-        theme: terminalColors(),
+-        scrollback: 10_000,
+-        ghostty: g,
+-      })
+-      cleanups.push(() => t.dispose())
+-      if (disposed) {
+-        cleanup()
+-        return
+-      }
+-      ghostty = g
+-      term = t
+-      output = terminalWriter((data, done) => t.write(data, done))
+-
+-      t.attachCustomKeyEventHandler((event) => {
+-        const key = event.key.toLowerCase()
+-
+-        if (event.ctrlKey && event.shiftKey && !event.metaKey && key === "c") {
+-          document.execCommand("copy")
+-          return true
+-        }
+-
+-        // allow for toggle terminal keybinds in parent
+-        const config = settings.keybinds.get(TOGGLE_TERMINAL_ID) ?? DEFAULT_TOGGLE_TERMINAL_KEYBIND
+-        const keybinds = parseKeybind(config)
+-
+-        return matchKeybind(keybinds, event)
+-      })
+-
+-      const fit = new mod.FitAddon()
+-      const serializer = new SerializeAddon()
+-      cleanups.push(() => disposeIfDisposable(fit))
+-      t.loadAddon(serializer)
+-      t.loadAddon(fit)
+-      fitAddon = fit
+-      serializeAddon = serializer
+-
+-      t.open(container)
+-      useTerminalUiBindings({
+-        container,
+-        term: t,
+-        cleanups,
+-        handlePointerDown,
+-        handleLinkClick,
+-      })
+-
+-      focusTerminal()
+-
+-      if (typeof document !== "undefined" && document.fonts) {
+-        document.fonts.ready.then(scheduleFit)
+-      }
+-
+-      const onResize = t.onResize((size) => {
+-        scheduleSize(size.cols, size.rows)
+-      })
+-      cleanups.push(() => disposeIfDisposable(onResize))
+-      const onData = t.onData((data) => {
+-        if (ws?.readyState === WebSocket.OPEN) ws.send(data)
+-      })
+-      cleanups.push(() => disposeIfDisposable(onData))
+-      const onKey = t.onKey((key) => {
+-        if (key.key == "Enter") {
+-          props.onSubmit?.()
+-        }
+-      })
+-      cleanups.push(() => disposeIfDisposable(onKey))
+-
+-      const startResize = () => {
+-        fit.observeResize()
+-        handleResize = scheduleFit
+-        window.addEventListener("resize", handleResize)
+-        cleanups.push(() => window.removeEventListener("resize", handleResize))
+-      }
+-
+-      const write = (data: string) =>
+-        new Promise<void>((resolve) => {
+-          if (!output) {
+-            resolve()
+-            return
+-          }
+-          output.push(data)
+-          output.flush(resolve)
+-        })
+-
+-      if (restore && restoreSize) {
+-        await write(restore)
+-        fit.fit()
+-        scheduleSize(t.cols, t.rows)
+-        if (typeof local.pty.scrollY === "number") t.scrollToLine(local.pty.scrollY)
+-        startResize()
+-      } else {
+-        fit.fit()
+-        scheduleSize(t.cols, t.rows)
+-        if (restore) {
+-          await write(restore)
+-          if (typeof local.pty.scrollY === "number") t.scrollToLine(local.pty.scrollY)
+-        }
+-        startResize()
+-      }
+-
+-      // t.onScroll((ydisp) => {
+-      // console.log("Scroll position:", ydisp)
+-      // })
+-
+-      const once = { value: false }
+-      let closing = false
+-
+-      const url = new URL(sdk.url + `/pty/${local.pty.id}/connect`)
+-      url.searchParams.set("directory", sdk.directory)
+-      url.searchParams.set("cursor", String(start !== undefined ? start : local.pty.buffer ? -1 : 0))
+-      url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
+-      url.username = server.current?.http.username ?? ""
+-      url.password = server.current?.http.password ?? ""
+-
+-      const socket = new WebSocket(url)
+-      socket.binaryType = "arraybuffer"
+-      ws = socket
+-
+-      const handleOpen = () => {
+-        local.onConnect?.()
+-        scheduleSize(t.cols, t.rows)
+-      }
+-      socket.addEventListener("open", handleOpen)
+-      if (socket.readyState === WebSocket.OPEN) handleOpen()
+-
+-      const decoder = new TextDecoder()
+-      const handleMessage = (event: MessageEvent) => {
+-        if (disposed) return
+-        if (closing) return
+-        if (event.data instanceof ArrayBuffer) {
+-          const bytes = new Uint8Array(event.data)
+-          if (bytes[0] !== 0) return
+-          const json = decoder.decode(bytes.subarray(1))
+-          try {
+-            const meta = JSON.parse(json) as { cursor?: unknown }
+-            const next = meta?.cursor
+-            if (typeof next === "number" && Number.isSafeInteger(next) && next >= 0) {
+-              cursor = next
+-            }
+-          } catch (err) {
+-            debugTerminal("invalid websocket control frame", err)
+-          }
+-          return
+-        }
+-
+-        const data = typeof event.data === "string" ? event.data : ""
+-        if (!data) return
+-        output?.push(data)
+-        cursor += data.length
+-      }
+-      socket.addEventListener("message", handleMessage)
+-
+-      const handleError = (error: Event) => {
+-        if (disposed) return
+-        if (closing) return
+-        if (once.value) return
+-        once.value = true
+-        console.error("WebSocket error:", error)
+-        local.onConnectError?.(error)
+-      }
+-      socket.addEventListener("error", handleError)
+-
+-      const handleClose = (event: CloseEvent) => {
+-        if (disposed) return
+-        if (closing) return
+-        // Normal closure (code 1000) means PTY process exited - server event handles cleanup
+-        // For other codes (network issues, server restart), trigger error handler
+-        if (event.code !== 1000) {
+-          if (once.value) return
+-          once.value = true
+-          local.onConnectError?.(new Error(`WebSocket closed abnormally: ${event.code}`))
+-        }
+-      }
+-      socket.addEventListener("close", handleClose)
+-
+-      cleanups.push(() => {
+-        closing = true
+-        socket.removeEventListener("open", handleOpen)
+-        socket.removeEventListener("message", handleMessage)
+-        socket.removeEventListener("error", handleError)
+-        socket.removeEventListener("close", handleClose)
+-        if (socket.readyState !== WebSocket.CLOSED && socket.readyState !== WebSocket.CLOSING) socket.close(1000)
+-      })
+-    }
+-
+-    void run().catch((err) => {
+-      if (disposed) return
+-      showToast({
+-        variant: "error",
+-        title: language.t("terminal.connectionLost.title"),
+-        description: err instanceof Error ? err.message : language.t("terminal.connectionLost.description"),
+-      })
+-      local.onConnectError?.(err)
+-    })
+-  })
+-
+-  onCleanup(() => {
+-    disposed = true
+-    if (fitFrame !== undefined) cancelAnimationFrame(fitFrame)
+-    if (sizeTimer !== undefined) clearTimeout(sizeTimer)
+-    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) ws.close()
+-
+-    const finalize = () => {
+-      persistTerminal({ term, addon: serializeAddon, cursor, pty: local.pty, onCleanup: props.onCleanup })
+-      cleanup()
+-    }
+-
+-    if (!output) {
+-      finalize()
+-      return
+-    }
+-
+-    output.flush(finalize)
+-  })
+-
+-  return (
+-    <div
+-      ref={container}
+-      data-component="terminal"
+-      data-prevent-autofocus
+-      tabIndex={-1}
+-      style={{ "background-color": terminalColors().background }}
+-      classList={{
+-        ...(local.classList ?? {}),
+-        "select-text": true,
+-        "size-full px-6 py-3 font-mono relative overflow-hidden": true,
+-        [local.class ?? ""]: !!local.class,
+-      }}
+-      {...others}
+-    />
+-  )
++	const platform = usePlatform()
++	const sdk = useSDK()
++	const settings = useSettings()
++	const theme = useTheme()
++	const language = useLanguage()
++	const server = useServer()
++	let container!: HTMLDivElement
++	const [local, others] = splitProps(props, ["pty", "class", "classList", "onConnect", "onConnectError"])
++	let ws: WebSocket | undefined
++	let term: Term | undefined
++	let ghostty: Ghostty
++	let serializeAddon: SerializeAddon
++	let fitAddon: FitAddon
++	let handleResize: () => void
++	let fitFrame: number | undefined
++	let sizeTimer: ReturnType<typeof setTimeout> | undefined
++	let pendingSize: { cols: number; rows: number } | undefined
++	let lastSize: { cols: number; rows: number } | undefined
++	let disposed = false
++	const cleanups: VoidFunction[] = []
++	const start =
++		typeof local.pty.cursor === "number" && Number.isSafeInteger(local.pty.cursor) ? local.pty.cursor : undefined
++	let cursor = start ?? 0
++	let output: ReturnType<typeof terminalWriter> | undefined
++
++	const cleanup = () => {
++		if (!cleanups.length) return
++		const fns = cleanups.splice(0).reverse()
++		for (const fn of fns) {
++			try {
++				fn()
++			} catch (err) {
++				debugTerminal("cleanup failed", err)
++			}
++		}
++	}
++
++	const pushSize = (cols: number, rows: number) => {
++		return sdk.client.pty
++			.update({
++				ptyID: local.pty.id,
++				size: { cols, rows },
++			})
++			.catch((err) => {
++				debugTerminal("failed to sync terminal size", err)
++			})
++	}
++
++	const getTerminalColors = (): TerminalColors => {
++		const mode = theme.mode() === "dark" ? "dark" : "light"
++		const fallback = DEFAULT_TERMINAL_COLORS[mode]
++		const currentTheme = theme.themes()[theme.themeId()]
++		if (!currentTheme) return fallback
++		const variant = mode === "dark" ? currentTheme.dark : currentTheme.light
++		if (!variant?.seeds) return fallback
++		const resolved = resolveThemeVariant(variant, mode === "dark")
++		const text = resolved["text-stronger"] ?? fallback.foreground
++		const background = resolved["background-stronger"] ?? fallback.background
++		const alpha = mode === "dark" ? 0.25 : 0.2
++		const base = text.startsWith("#") ? (text as HexColor) : (fallback.foreground as HexColor)
++		const selectionBackground = withAlpha(base, alpha)
++		return {
++			background,
++			foreground: text,
++			cursor: text,
++			selectionBackground,
++		}
++	}
++
++	const [terminalColors, setTerminalColors] = createSignal<TerminalColors>(getTerminalColors())
++
++	const scheduleFit = () => {
++		if (disposed) return
++		if (!fitAddon) return
++		if (fitFrame !== undefined) return
++
++		fitFrame = requestAnimationFrame(() => {
++			fitFrame = undefined
++			if (disposed) return
++			fitAddon.fit()
++		})
++	}
++
++	const scheduleSize = (cols: number, rows: number) => {
++		if (disposed) return
++		if (lastSize?.cols === cols && lastSize?.rows === rows) return
++
++		pendingSize = { cols, rows }
++
++		if (!lastSize) {
++			lastSize = pendingSize
++			void pushSize(cols, rows)
++			return
++		}
++
++		if (sizeTimer !== undefined) return
++		sizeTimer = setTimeout(() => {
++			sizeTimer = undefined
++			const next = pendingSize
++			if (!next) return
++			pendingSize = undefined
++			if (disposed) return
++			if (lastSize?.cols === next.cols && lastSize?.rows === next.rows) return
++			lastSize = next
++			void pushSize(next.cols, next.rows)
++		}, 100)
++	}
++
++	createEffect(() => {
++		const colors = getTerminalColors()
++		setTerminalColors(colors)
++		if (!term) return
++		setOptionIfSupported(term, "theme", colors)
++	})
++
++	createEffect(() => {
++		const font = monoFontFamily(settings.appearance.font())
++		if (!term) return
++		setOptionIfSupported(term, "fontFamily", font)
++		scheduleFit()
++	})
++
++	let zoom = platform.webviewZoom?.()
++	createEffect(() => {
++		const next = platform.webviewZoom?.()
++		if (next === undefined) return
++		if (next === zoom) return
++		zoom = next
++		scheduleFit()
++	})
++
++	const focusTerminal = () => {
++		const t = term
++		if (!t) return
++		t.focus()
++		t.textarea?.focus()
++		setTimeout(() => t.textarea?.focus(), 0)
++	}
++	const handlePointerDown = () => {
++		const activeElement = document.activeElement
++		if (activeElement instanceof HTMLElement && activeElement !== container && !container.contains(activeElement)) {
++			activeElement.blur()
++		}
++		focusTerminal()
++	}
++
++	const handleLinkClick = (event: MouseEvent) => {
++		if (!event.shiftKey && !event.ctrlKey && !event.metaKey) return
++		if (event.altKey) return
++		if (event.button !== 0) return
++
++		const t = term
++		if (!t) return
++
++		const text = getHoveredLinkText(t)
++		if (!text) return
++
++		event.preventDefault()
++		event.stopImmediatePropagation()
++		platform.openLink(text)
++	}
++
++	onMount(() => {
++		const run = async () => {
++			const loaded = await loadGhostty()
++			if (disposed) return
++
++			const mod = loaded.mod
++			const g = loaded.ghostty
++
++			const restore = typeof local.pty.buffer === "string" ? local.pty.buffer : ""
++			const restoreSize =
++				restore &&
++					typeof local.pty.cols === "number" &&
++					Number.isSafeInteger(local.pty.cols) &&
++					local.pty.cols > 0 &&
++					typeof local.pty.rows === "number" &&
++					Number.isSafeInteger(local.pty.rows) &&
++					local.pty.rows > 0
++					? { cols: local.pty.cols, rows: local.pty.rows }
++					: undefined
++
++			const t = new mod.Terminal({
++				cursorBlink: true,
++				cursorStyle: "bar",
++				cols: restoreSize?.cols,
++				rows: restoreSize?.rows,
++				fontSize: 14,
++				fontFamily: monoFontFamily(settings.appearance.font()),
++				allowTransparency: false,
++				convertEol: false,
++				theme: terminalColors(),
++				scrollback: 10_000,
++				ghostty: g,
++			})
++			cleanups.push(() => t.dispose())
++			if (disposed) {
++				cleanup()
++				return
++			}
++			ghostty = g
++			term = t
++			output = terminalWriter((data, done) => t.write(data, done))
++
++			t.attachCustomKeyEventHandler((event) => {
++				const key = event.key.toLowerCase()
++
++				if (event.ctrlKey && event.shiftKey && !event.metaKey && key === "c") {
++					const selection = t.getSelection()
++					if (selection) {
++						navigator.clipboard.writeText(selection).catch(() => {
++							document.execCommand("copy")
++						})
++					} else {
++						document.execCommand("copy")
++					}
++					return true
++				}
++
++				if (event.ctrlKey && !event.shiftKey && !event.metaKey && key === "c") {
++					const selection = t.getSelection()
++					if (selection) {
++						navigator.clipboard.writeText(selection).catch(() => {
++							document.execCommand("copy")
++						})
++						t.clearSelection()
++						return false // Let it propagate if we want Ctrl+C to also cancel, but usually we just want to copy if there is selection
++					}
++				}
++
++				// allow for toggle terminal keybinds in parent
++				const config = settings.keybinds.get(TOGGLE_TERMINAL_ID) ?? DEFAULT_TOGGLE_TERMINAL_KEYBIND
++				const keybinds = parseKeybind(config)
++
++				return matchKeybind(keybinds, event)
++			})
++
++			const fit = new mod.FitAddon()
++			const serializer = new SerializeAddon()
++			cleanups.push(() => disposeIfDisposable(fit))
++			t.loadAddon(serializer)
++			t.loadAddon(fit)
++			fitAddon = fit
++			serializeAddon = serializer
++
++			t.open(container)
++			useTerminalUiBindings({
++				container,
++				term: t,
++				cleanups,
++				handlePointerDown,
++				handleLinkClick,
++			})
++
++			focusTerminal()
++
++			if (typeof document !== "undefined" && document.fonts) {
++				document.fonts.ready.then(scheduleFit)
++			}
++
++			const onResize = t.onResize((size) => {
++				scheduleSize(size.cols, size.rows)
++			})
++			cleanups.push(() => disposeIfDisposable(onResize))
++			const onData = t.onData((data) => {
++				if (ws?.readyState === WebSocket.OPEN) ws.send(data)
++			})
++			cleanups.push(() => disposeIfDisposable(onData))
++			const onKey = t.onKey((key) => {
++				if (key.key == "Enter") {
++					props.onSubmit?.()
++				}
++			})
++			cleanups.push(() => disposeIfDisposable(onKey))
++
++			const startResize = () => {
++				fit.observeResize()
++				handleResize = scheduleFit
++				window.addEventListener("resize", handleResize)
++				cleanups.push(() => window.removeEventListener("resize", handleResize))
++			}
++
++			const write = (data: string) =>
++				new Promise<void>((resolve) => {
++					if (!output) {
++						resolve()
++						return
++					}
++					output.push(data)
++					output.flush(resolve)
++				})
++
++			if (restore && restoreSize) {
++				await write(restore)
++				fit.fit()
++				scheduleSize(t.cols, t.rows)
++				if (typeof local.pty.scrollY === "number") t.scrollToLine(local.pty.scrollY)
++				startResize()
++			} else {
++				fit.fit()
++				scheduleSize(t.cols, t.rows)
++				if (restore) {
++					await write(restore)
++					if (typeof local.pty.scrollY === "number") t.scrollToLine(local.pty.scrollY)
++				}
++				startResize()
++			}
++
++			// t.onScroll((ydisp) => {
++			// console.log("Scroll position:", ydisp)
++			// })
++
++			const once = { value: false }
++			let closing = false
++
++			const url = new URL(sdk.url + `/pty/${local.pty.id}/connect`)
++			url.searchParams.set("directory", sdk.directory)
++			url.searchParams.set("cursor", String(start !== undefined ? start : local.pty.buffer ? -1 : 0))
++			url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
++			url.username = server.current?.http.username ?? ""
++			url.password = server.current?.http.password ?? ""
++
++			const socket = new WebSocket(url)
++			socket.binaryType = "arraybuffer"
++			ws = socket
++
++			const handleOpen = () => {
++				local.onConnect?.()
++				scheduleSize(t.cols, t.rows)
++			}
++			socket.addEventListener("open", handleOpen)
++			if (socket.readyState === WebSocket.OPEN) handleOpen()
++
++			const decoder = new TextDecoder()
++			const handleMessage = (event: MessageEvent) => {
++				if (disposed) return
++				if (closing) return
++				if (event.data instanceof ArrayBuffer) {
++					const bytes = new Uint8Array(event.data)
++					if (bytes[0] !== 0) return
++					const json = decoder.decode(bytes.subarray(1))
++					try {
++						const meta = JSON.parse(json) as { cursor?: unknown }
++						const next = meta?.cursor
++						if (typeof next === "number" && Number.isSafeInteger(next) && next >= 0) {
++							cursor = next
++						}
++					} catch (err) {
++						debugTerminal("invalid websocket control frame", err)
++					}
++					return
++				}
++
++				const data = typeof event.data === "string" ? event.data : ""
++				if (!data) return
++				output?.push(data)
++				cursor += data.length
++			}
++			socket.addEventListener("message", handleMessage)
++
++			const handleError = (error: Event) => {
++				if (disposed) return
++				if (closing) return
++				if (once.value) return
++				once.value = true
++				console.error("WebSocket error:", error)
++				local.onConnectError?.(error)
++			}
++			socket.addEventListener("error", handleError)
++
++			const handleClose = (event: CloseEvent) => {
++				if (disposed) return
++				if (closing) return
++				// Normal closure (code 1000) means PTY process exited - server event handles cleanup
++				// For other codes (network issues, server restart), trigger error handler
++				if (event.code !== 1000) {
++					if (once.value) return
++					once.value = true
++					local.onConnectError?.(new Error(`WebSocket closed abnormally: ${event.code}`))
++				}
++			}
++			socket.addEventListener("close", handleClose)
++
++			cleanups.push(() => {
++				closing = true
++				socket.removeEventListener("open", handleOpen)
++				socket.removeEventListener("message", handleMessage)
++				socket.removeEventListener("error", handleError)
++				socket.removeEventListener("close", handleClose)
++				if (socket.readyState !== WebSocket.CLOSED && socket.readyState !== WebSocket.CLOSING) socket.close(1000)
++			})
++		}
++
++		void run().catch((err) => {
++			if (disposed) return
++			showToast({
++				variant: "error",
++				title: language.t("terminal.connectionLost.title"),
++				description: err instanceof Error ? err.message : language.t("terminal.connectionLost.description"),
++			})
++			local.onConnectError?.(err)
++		})
++	})
++
++	onCleanup(() => {
++		disposed = true
++		if (fitFrame !== undefined) cancelAnimationFrame(fitFrame)
++		if (sizeTimer !== undefined) clearTimeout(sizeTimer)
++		if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) ws.close()
++
++		const finalize = () => {
++			persistTerminal({ term, addon: serializeAddon, cursor, pty: local.pty, onCleanup: props.onCleanup })
++			cleanup()
++		}
++
++		if (!output) {
++			finalize()
++			return
++		}
++
++		output.flush(finalize)
++	})
++
++	return (
++		<div
++			ref={container}
++			data-component="terminal"
++			data-prevent-autofocus
++			tabIndex={-1}
++			style={{ "background-color": terminalColors().background }}
++			classList={{
++				...(local.classList ?? {}),
++				"select-text": true,
++				"size-full px-6 py-3 font-mono relative overflow-hidden": true,
++				[local.class ?? ""]: !!local.class,
++			}}
++			{...others}
++		/>
++	)
+ }
+diff --git a/packages/opencode/package.json b/packages/opencode/package.json
+index 8281d4ff0..50419fd99 100644
+--- a/packages/opencode/package.json
++++ b/packages/opencode/package.json
+@@ -1,6 +1,6 @@
+ {
+   "$schema": "https://json.schemastore.org/package.json",
+-  "version": "1.2.7",
++  "version": "1.2.7n",
+   "name": "opencode",
+   "type": "module",
+   "license": "MIT",
+diff --git a/packages/opencode/script/build.ts b/packages/opencode/script/build.ts
+index ddb476991..8652c38b6 100755
+--- a/packages/opencode/script/build.ts
++++ b/packages/opencode/script/build.ts
+@@ -206,7 +206,7 @@ for (const item of targets) {
+   binaries[name] = Script.version
+ }
+ 
+-if (Script.release) {
++if (false) {
+   for (const key of Object.keys(binaries)) {
+     if (key.includes("linux")) {
+       await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
+diff --git a/packages/opencode/src/cli/cmd/tui/app.tsx b/packages/opencode/src/cli/cmd/tui/app.tsx
+index ab3d09689..d4685ebc0 100644
+--- a/packages/opencode/src/cli/cmd/tui/app.tsx
++++ b/packages/opencode/src/cli/cmd/tui/app.tsx
+@@ -40,801 +40,819 @@ import { writeHeapSnapshot } from "v8"
+ import { PromptRefProvider, usePromptRef } from "./context/prompt"
+ 
+ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
+-  // can't set raw mode if not a TTY
+-  if (!process.stdin.isTTY) return "dark"
+-
+-  return new Promise((resolve) => {
+-    let timeout: NodeJS.Timeout
+-
+-    const cleanup = () => {
+-      process.stdin.setRawMode(false)
+-      process.stdin.removeListener("data", handler)
+-      clearTimeout(timeout)
+-    }
+-
+-    const handler = (data: Buffer) => {
+-      const str = data.toString()
+-      const match = str.match(/\x1b]11;([^\x07\x1b]+)/)
+-      if (match) {
+-        cleanup()
+-        const color = match[1]
+-        // Parse RGB values from color string
+-        // Formats: rgb:RR/GG/BB or #RRGGBB or rgb(R,G,B)
+-        let r = 0,
+-          g = 0,
+-          b = 0
+-
+-        if (color.startsWith("rgb:")) {
+-          const parts = color.substring(4).split("/")
+-          r = parseInt(parts[0], 16) >> 8 // Convert 16-bit to 8-bit
+-          g = parseInt(parts[1], 16) >> 8 // Convert 16-bit to 8-bit
+-          b = parseInt(parts[2], 16) >> 8 // Convert 16-bit to 8-bit
+-        } else if (color.startsWith("#")) {
+-          r = parseInt(color.substring(1, 3), 16)
+-          g = parseInt(color.substring(3, 5), 16)
+-          b = parseInt(color.substring(5, 7), 16)
+-        } else if (color.startsWith("rgb(")) {
+-          const parts = color.substring(4, color.length - 1).split(",")
+-          r = parseInt(parts[0])
+-          g = parseInt(parts[1])
+-          b = parseInt(parts[2])
+-        }
+-
+-        // Calculate luminance using relative luminance formula
+-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+-
+-        // Determine if dark or light based on luminance threshold
+-        resolve(luminance > 0.5 ? "light" : "dark")
+-      }
+-    }
+-
+-    process.stdin.setRawMode(true)
+-    process.stdin.on("data", handler)
+-    process.stdout.write("\x1b]11;?\x07")
+-
+-    timeout = setTimeout(() => {
+-      cleanup()
+-      resolve("dark")
+-    }, 1000)
+-  })
++	// can't set raw mode if not a TTY
++	if (!process.stdin.isTTY) return "dark"
++
++	return new Promise((resolve) => {
++		let timeout: NodeJS.Timeout
++
++		const cleanup = () => {
++			process.stdin.setRawMode(false)
++			process.stdin.removeListener("data", handler)
++			clearTimeout(timeout)
++		}
++
++		const handler = (data: Buffer) => {
++			const str = data.toString()
++			const match = str.match(/\x1b]11;([^\x07\x1b]+)/)
++			if (match) {
++				cleanup()
++				const color = match[1]
++				// Parse RGB values from color string
++				// Formats: rgb:RR/GG/BB or #RRGGBB or rgb(R,G,B)
++				let r = 0,
++					g = 0,
++					b = 0
++
++				if (color.startsWith("rgb:")) {
++					const parts = color.substring(4).split("/")
++					r = parseInt(parts[0], 16) >> 8 // Convert 16-bit to 8-bit
++					g = parseInt(parts[1], 16) >> 8 // Convert 16-bit to 8-bit
++					b = parseInt(parts[2], 16) >> 8 // Convert 16-bit to 8-bit
++				} else if (color.startsWith("#")) {
++					r = parseInt(color.substring(1, 3), 16)
++					g = parseInt(color.substring(3, 5), 16)
++					b = parseInt(color.substring(5, 7), 16)
++				} else if (color.startsWith("rgb(")) {
++					const parts = color.substring(4, color.length - 1).split(",")
++					r = parseInt(parts[0])
++					g = parseInt(parts[1])
++					b = parseInt(parts[2])
++				}
++
++				// Calculate luminance using relative luminance formula
++				const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
++
++				// Determine if dark or light based on luminance threshold
++				resolve(luminance > 0.5 ? "light" : "dark")
++			}
++		}
++
++		process.stdin.setRawMode(true)
++		process.stdin.on("data", handler)
++		process.stdout.write("\x1b]11;?\x07")
++
++		timeout = setTimeout(() => {
++			cleanup()
++			resolve("dark")
++		}, 1000)
++	})
+ }
+ 
+ import type { EventSource } from "./context/sdk"
+ 
+ export function tui(input: {
+-  url: string
+-  args: Args
+-  directory?: string
+-  fetch?: typeof fetch
+-  headers?: RequestInit["headers"]
+-  events?: EventSource
+-  onExit?: () => Promise<void>
++	url: string
++	args: Args
++	directory?: string
++	fetch?: typeof fetch
++	headers?: RequestInit["headers"]
++	events?: EventSource
++	onExit?: () => Promise<void>
+ }) {
+-  // promise to prevent immediate exit
+-  return new Promise<void>(async (resolve) => {
+-    const unguard = win32InstallCtrlCGuard()
+-    win32DisableProcessedInput()
+-
+-    const mode = await getTerminalBackgroundColor()
+-
+-    // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
+-    // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
+-    win32DisableProcessedInput()
+-
+-    const onExit = async () => {
+-      unguard?.()
+-      await input.onExit?.()
+-      resolve()
+-    }
+-
+-    render(
+-      () => {
+-        return (
+-          <ErrorBoundary
+-            fallback={(error, reset) => <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />}
+-          >
+-            <ArgsProvider {...input.args}>
+-              <ExitProvider onExit={onExit}>
+-                <KVProvider>
+-                  <ToastProvider>
+-                    <RouteProvider>
+-                      <SDKProvider
+-                        url={input.url}
+-                        directory={input.directory}
+-                        fetch={input.fetch}
+-                        headers={input.headers}
+-                        events={input.events}
+-                      >
+-                        <SyncProvider>
+-                          <ThemeProvider mode={mode}>
+-                            <LocalProvider>
+-                              <KeybindProvider>
+-                                <PromptStashProvider>
+-                                  <DialogProvider>
+-                                    <CommandProvider>
+-                                      <FrecencyProvider>
+-                                        <PromptHistoryProvider>
+-                                          <PromptRefProvider>
+-                                            <App />
+-                                          </PromptRefProvider>
+-                                        </PromptHistoryProvider>
+-                                      </FrecencyProvider>
+-                                    </CommandProvider>
+-                                  </DialogProvider>
+-                                </PromptStashProvider>
+-                              </KeybindProvider>
+-                            </LocalProvider>
+-                          </ThemeProvider>
+-                        </SyncProvider>
+-                      </SDKProvider>
+-                    </RouteProvider>
+-                  </ToastProvider>
+-                </KVProvider>
+-              </ExitProvider>
+-            </ArgsProvider>
+-          </ErrorBoundary>
+-        )
+-      },
+-      {
+-        targetFps: 60,
+-        gatherStats: false,
+-        exitOnCtrlC: false,
+-        useKittyKeyboard: {},
+-        autoFocus: false,
+-        openConsoleOnError: false,
+-        consoleOptions: {
+-          keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
+-          onCopySelection: (text) => {
+-            Clipboard.copy(text).catch((error) => {
+-              console.error(`Failed to copy console selection to clipboard: ${error}`)
+-            })
+-          },
+-        },
+-      },
+-    )
+-  })
++	// promise to prevent immediate exit
++	return new Promise<void>(async (resolve) => {
++
++		// --- MOUSE TRACKING HACK ---
++		// Prevent @opentui from enabling terminal mouse tracking so the host terminal
++		// (like tmux) can perform native text selection instead.
++		const originalWrite = process.stdout.write.bind(process.stdout);
++		(process.stdout as any).write = function (chunk: any, encoding?: any, callback?: any) {
++			if (typeof chunk === 'string') {
++				chunk = chunk.replace(/\x1b\[\?(1000|1002|1003|1006|1015)h/g, '');
++			} else if (Buffer.isBuffer(chunk)) {
++				const str = chunk.toString();
++				if (str.includes('\\x1b[?100') || str.includes('\x1b[?100')) {
++					chunk = Buffer.from(str.replace(/\x1b\[\?(1000|1002|1003|1006|1015)h/g, ''));
++				}
++			}
++			return originalWrite(chunk, encoding, callback);
++		};
++		// ---------------------------
++
++		const unguard = win32InstallCtrlCGuard()
++		win32DisableProcessedInput()
++
++		const mode = await getTerminalBackgroundColor()
++
++		// Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
++		// the original console mode which re-enables ENABLE_PROCESSED_INPUT.
++		win32DisableProcessedInput()
++
++		const onExit = async () => {
++			unguard?.()
++			await input.onExit?.()
++			resolve()
++		}
++
++		render(
++			() => {
++				return (
++					<ErrorBoundary
++						fallback={(error, reset) => <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />}
++					>
++						<ArgsProvider {...input.args}>
++							<ExitProvider onExit={onExit}>
++								<KVProvider>
++									<ToastProvider>
++										<RouteProvider>
++											<SDKProvider
++												url={input.url}
++												directory={input.directory}
++												fetch={input.fetch}
++												headers={input.headers}
++												events={input.events}
++											>
++												<SyncProvider>
++													<ThemeProvider mode={mode}>
++														<LocalProvider>
++															<KeybindProvider>
++																<PromptStashProvider>
++																	<DialogProvider>
++																		<CommandProvider>
++																			<FrecencyProvider>
++																				<PromptHistoryProvider>
++																					<PromptRefProvider>
++																						<App />
++																					</PromptRefProvider>
++																				</PromptHistoryProvider>
++																			</FrecencyProvider>
++																		</CommandProvider>
++																	</DialogProvider>
++																</PromptStashProvider>
++															</KeybindProvider>
++														</LocalProvider>
++													</ThemeProvider>
++												</SyncProvider>
++											</SDKProvider>
++										</RouteProvider>
++									</ToastProvider>
++								</KVProvider>
++							</ExitProvider>
++						</ArgsProvider>
++					</ErrorBoundary>
++				)
++			},
++			{
++				targetFps: 60,
++				gatherStats: false,
++				exitOnCtrlC: false,
++				useKittyKeyboard: {},
++				autoFocus: false,
++				openConsoleOnError: false,
++				consoleOptions: {
++					keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
++					onCopySelection: (text) => {
++						Clipboard.copy(text).catch((error) => {
++							console.error(`Failed to copy console selection to clipboard: ${error}`)
++						})
++					},
++				},
++			},
++		)
++	})
+ }
+ 
+ function App() {
+-  const route = useRoute()
+-  const dimensions = useTerminalDimensions()
+-  const renderer = useRenderer()
+-  renderer.disableStdoutInterception()
+-  const dialog = useDialog()
+-  const local = useLocal()
+-  const kv = useKV()
+-  const command = useCommandDialog()
+-  const sdk = useSDK()
+-  const toast = useToast()
+-  const { theme, mode, setMode } = useTheme()
+-  const sync = useSync()
+-  const exit = useExit()
+-  const promptRef = usePromptRef()
+-
+-  useKeyboard((evt) => {
+-    if (!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT) return
+-    if (!renderer.getSelection()) return
+-
+-    // Windows Terminal-like behavior:
+-    // - Ctrl+C copies and dismisses selection
+-    // - Esc dismisses selection
+-    // - Most other key input dismisses selection and is passed through
+-    if (evt.ctrl && evt.name === "c") {
+-      if (!Selection.copy(renderer, toast)) {
+-        renderer.clearSelection()
+-        return
+-      }
+-
+-      evt.preventDefault()
+-      evt.stopPropagation()
+-      return
+-    }
+-
+-    if (evt.name === "escape") {
+-      renderer.clearSelection()
+-      evt.preventDefault()
+-      evt.stopPropagation()
+-      return
+-    }
+-
+-    renderer.clearSelection()
+-  })
+-
+-  // Wire up console copy-to-clipboard via opentui's onCopySelection callback
+-  renderer.console.onCopySelection = async (text: string) => {
+-    if (!text || text.length === 0) return
+-
+-    await Clipboard.copy(text)
+-      .then(() => toast.show({ message: "Copied to clipboard", variant: "info" }))
+-      .catch(toast.error)
+-
+-    renderer.clearSelection()
+-  }
+-  const [terminalTitleEnabled, setTerminalTitleEnabled] = createSignal(kv.get("terminal_title_enabled", true))
+-
+-  createEffect(() => {
+-    console.log(JSON.stringify(route.data))
+-  })
+-
+-  // Update terminal window title based on current route and session
+-  createEffect(() => {
+-    if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
+-
+-    if (route.data.type === "home") {
+-      renderer.setTerminalTitle("OpenCode")
+-      return
+-    }
+-
+-    if (route.data.type === "session") {
+-      const session = sync.session.get(route.data.sessionID)
+-      if (!session || SessionApi.isDefaultTitle(session.title)) {
+-        renderer.setTerminalTitle("OpenCode")
+-        return
+-      }
+-
+-      // Truncate title to 40 chars max
+-      const title = session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title
+-      renderer.setTerminalTitle(`OC | ${title}`)
+-    }
+-  })
+-
+-  const args = useArgs()
+-  onMount(() => {
+-    batch(() => {
+-      if (args.agent) local.agent.set(args.agent)
+-      if (args.model) {
+-        const { providerID, modelID } = Provider.parseModel(args.model)
+-        if (!providerID || !modelID)
+-          return toast.show({
+-            variant: "warning",
+-            message: `Invalid model format: ${args.model}`,
+-            duration: 3000,
+-          })
+-        local.model.set({ providerID, modelID }, { recent: true })
+-      }
+-      // Handle --session without --fork immediately (fork is handled in createEffect below)
+-      if (args.sessionID && !args.fork) {
+-        route.navigate({
+-          type: "session",
+-          sessionID: args.sessionID,
+-        })
+-      }
+-    })
+-  })
+-
+-  let continued = false
+-  createEffect(() => {
+-    // When using -c, session list is loaded in blocking phase, so we can navigate at "partial"
+-    if (continued || sync.status === "loading" || !args.continue) return
+-    const match = sync.data.session
+-      .toSorted((a, b) => b.time.updated - a.time.updated)
+-      .find((x) => x.parentID === undefined)?.id
+-    if (match) {
+-      continued = true
+-      if (args.fork) {
+-        sdk.client.session.fork({ sessionID: match }).then((result) => {
+-          if (result.data?.id) {
+-            route.navigate({ type: "session", sessionID: result.data.id })
+-          } else {
+-            toast.show({ message: "Failed to fork session", variant: "error" })
+-          }
+-        })
+-      } else {
+-        route.navigate({ type: "session", sessionID: match })
+-      }
+-    }
+-  })
+-
+-  // Handle --session with --fork: wait for sync to be fully complete before forking
+-  // (session list loads in non-blocking phase for --session, so we must wait for "complete"
+-  // to avoid a race where reconcile overwrites the newly forked session)
+-  let forked = false
+-  createEffect(() => {
+-    if (forked || sync.status !== "complete" || !args.sessionID || !args.fork) return
+-    forked = true
+-    sdk.client.session.fork({ sessionID: args.sessionID }).then((result) => {
+-      if (result.data?.id) {
+-        route.navigate({ type: "session", sessionID: result.data.id })
+-      } else {
+-        toast.show({ message: "Failed to fork session", variant: "error" })
+-      }
+-    })
+-  })
+-
+-  createEffect(
+-    on(
+-      () => sync.status === "complete" && sync.data.provider.length === 0,
+-      (isEmpty, wasEmpty) => {
+-        // only trigger when we transition into an empty-provider state
+-        if (!isEmpty || wasEmpty) return
+-        dialog.replace(() => <DialogProviderList />)
+-      },
+-    ),
+-  )
+-
+-  const connected = useConnected()
+-  command.register(() => [
+-    {
+-      title: "Switch session",
+-      value: "session.list",
+-      keybind: "session_list",
+-      category: "Session",
+-      suggested: sync.data.session.length > 0,
+-      slash: {
+-        name: "sessions",
+-        aliases: ["resume", "continue"],
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogSessionList />)
+-      },
+-    },
+-    {
+-      title: "New session",
+-      suggested: route.data.type === "session",
+-      value: "session.new",
+-      keybind: "session_new",
+-      category: "Session",
+-      slash: {
+-        name: "new",
+-        aliases: ["clear"],
+-      },
+-      onSelect: () => {
+-        const current = promptRef.current
+-        // Don't require focus - if there's any text, preserve it
+-        const currentPrompt = current?.current?.input ? current.current : undefined
+-        route.navigate({
+-          type: "home",
+-          initialPrompt: currentPrompt,
+-        })
+-        dialog.clear()
+-      },
+-    },
+-    {
+-      title: "Switch model",
+-      value: "model.list",
+-      keybind: "model_list",
+-      suggested: true,
+-      category: "Agent",
+-      slash: {
+-        name: "models",
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogModel />)
+-      },
+-    },
+-    {
+-      title: "Model cycle",
+-      value: "model.cycle_recent",
+-      keybind: "model_cycle_recent",
+-      category: "Agent",
+-      hidden: true,
+-      onSelect: () => {
+-        local.model.cycle(1)
+-      },
+-    },
+-    {
+-      title: "Model cycle reverse",
+-      value: "model.cycle_recent_reverse",
+-      keybind: "model_cycle_recent_reverse",
+-      category: "Agent",
+-      hidden: true,
+-      onSelect: () => {
+-        local.model.cycle(-1)
+-      },
+-    },
+-    {
+-      title: "Favorite cycle",
+-      value: "model.cycle_favorite",
+-      keybind: "model_cycle_favorite",
+-      category: "Agent",
+-      hidden: true,
+-      onSelect: () => {
+-        local.model.cycleFavorite(1)
+-      },
+-    },
+-    {
+-      title: "Favorite cycle reverse",
+-      value: "model.cycle_favorite_reverse",
+-      keybind: "model_cycle_favorite_reverse",
+-      category: "Agent",
+-      hidden: true,
+-      onSelect: () => {
+-        local.model.cycleFavorite(-1)
+-      },
+-    },
+-    {
+-      title: "Switch agent",
+-      value: "agent.list",
+-      keybind: "agent_list",
+-      category: "Agent",
+-      slash: {
+-        name: "agents",
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogAgent />)
+-      },
+-    },
+-    {
+-      title: "Toggle MCPs",
+-      value: "mcp.list",
+-      category: "Agent",
+-      slash: {
+-        name: "mcps",
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogMcp />)
+-      },
+-    },
+-    {
+-      title: "Agent cycle",
+-      value: "agent.cycle",
+-      keybind: "agent_cycle",
+-      category: "Agent",
+-      hidden: true,
+-      onSelect: () => {
+-        local.agent.move(1)
+-      },
+-    },
+-    {
+-      title: "Variant cycle",
+-      value: "variant.cycle",
+-      keybind: "variant_cycle",
+-      category: "Agent",
+-      hidden: true,
+-      onSelect: () => {
+-        local.model.variant.cycle()
+-      },
+-    },
+-    {
+-      title: "Agent cycle reverse",
+-      value: "agent.cycle.reverse",
+-      keybind: "agent_cycle_reverse",
+-      category: "Agent",
+-      hidden: true,
+-      onSelect: () => {
+-        local.agent.move(-1)
+-      },
+-    },
+-    {
+-      title: "Connect provider",
+-      value: "provider.connect",
+-      suggested: !connected(),
+-      slash: {
+-        name: "connect",
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogProviderList />)
+-      },
+-      category: "Provider",
+-    },
+-    {
+-      title: "View status",
+-      keybind: "status_view",
+-      value: "opencode.status",
+-      slash: {
+-        name: "status",
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogStatus />)
+-      },
+-      category: "System",
+-    },
+-    {
+-      title: "Switch theme",
+-      value: "theme.switch",
+-      keybind: "theme_list",
+-      slash: {
+-        name: "themes",
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogThemeList />)
+-      },
+-      category: "System",
+-    },
+-    {
+-      title: "Toggle appearance",
+-      value: "theme.switch_mode",
+-      onSelect: (dialog) => {
+-        setMode(mode() === "dark" ? "light" : "dark")
+-        dialog.clear()
+-      },
+-      category: "System",
+-    },
+-    {
+-      title: "Help",
+-      value: "help.show",
+-      slash: {
+-        name: "help",
+-      },
+-      onSelect: () => {
+-        dialog.replace(() => <DialogHelp />)
+-      },
+-      category: "System",
+-    },
+-    {
+-      title: "Open docs",
+-      value: "docs.open",
+-      onSelect: () => {
+-        open("https://opencode.ai/docs").catch(() => {})
+-        dialog.clear()
+-      },
+-      category: "System",
+-    },
+-    {
+-      title: "Exit the app",
+-      value: "app.exit",
+-      slash: {
+-        name: "exit",
+-        aliases: ["quit", "q"],
+-      },
+-      onSelect: () => exit(),
+-      category: "System",
+-    },
+-    {
+-      title: "Toggle debug panel",
+-      category: "System",
+-      value: "app.debug",
+-      onSelect: (dialog) => {
+-        renderer.toggleDebugOverlay()
+-        dialog.clear()
+-      },
+-    },
+-    {
+-      title: "Toggle console",
+-      category: "System",
+-      value: "app.console",
+-      onSelect: (dialog) => {
+-        renderer.console.toggle()
+-        dialog.clear()
+-      },
+-    },
+-    {
+-      title: "Write heap snapshot",
+-      category: "System",
+-      value: "app.heap_snapshot",
+-      onSelect: (dialog) => {
+-        const path = writeHeapSnapshot()
+-        toast.show({
+-          variant: "info",
+-          message: `Heap snapshot written to ${path}`,
+-          duration: 5000,
+-        })
+-        dialog.clear()
+-      },
+-    },
+-    {
+-      title: "Suspend terminal",
+-      value: "terminal.suspend",
+-      keybind: "terminal_suspend",
+-      category: "System",
+-      hidden: true,
+-      onSelect: () => {
+-        process.once("SIGCONT", () => {
+-          renderer.resume()
+-        })
+-
+-        renderer.suspend()
+-        // pid=0 means send the signal to all processes in the process group
+-        process.kill(0, "SIGTSTP")
+-      },
+-    },
+-    {
+-      title: terminalTitleEnabled() ? "Disable terminal title" : "Enable terminal title",
+-      value: "terminal.title.toggle",
+-      keybind: "terminal_title_toggle",
+-      category: "System",
+-      onSelect: (dialog) => {
+-        setTerminalTitleEnabled((prev) => {
+-          const next = !prev
+-          kv.set("terminal_title_enabled", next)
+-          if (!next) renderer.setTerminalTitle("")
+-          return next
+-        })
+-        dialog.clear()
+-      },
+-    },
+-    {
+-      title: kv.get("animations_enabled", true) ? "Disable animations" : "Enable animations",
+-      value: "app.toggle.animations",
+-      category: "System",
+-      onSelect: (dialog) => {
+-        kv.set("animations_enabled", !kv.get("animations_enabled", true))
+-        dialog.clear()
+-      },
+-    },
+-    {
+-      title: kv.get("diff_wrap_mode", "word") === "word" ? "Disable diff wrapping" : "Enable diff wrapping",
+-      value: "app.toggle.diffwrap",
+-      category: "System",
+-      onSelect: (dialog) => {
+-        const current = kv.get("diff_wrap_mode", "word")
+-        kv.set("diff_wrap_mode", current === "word" ? "none" : "word")
+-        dialog.clear()
+-      },
+-    },
+-  ])
+-
+-  createEffect(() => {
+-    const currentModel = local.model.current()
+-    if (!currentModel) return
+-    if (currentModel.providerID === "openrouter" && !kv.get("openrouter_warning", false)) {
+-      untrack(() => {
+-        DialogAlert.show(
+-          dialog,
+-          "Warning",
+-          "While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out OpenCode Zen\nhttps://opencode.ai/zen",
+-        ).then(() => kv.set("openrouter_warning", true))
+-      })
+-    }
+-  })
+-
+-  sdk.event.on(TuiEvent.CommandExecute.type, (evt) => {
+-    command.trigger(evt.properties.command)
+-  })
+-
+-  sdk.event.on(TuiEvent.ToastShow.type, (evt) => {
+-    toast.show({
+-      title: evt.properties.title,
+-      message: evt.properties.message,
+-      variant: evt.properties.variant,
+-      duration: evt.properties.duration,
+-    })
+-  })
+-
+-  sdk.event.on(TuiEvent.SessionSelect.type, (evt) => {
+-    route.navigate({
+-      type: "session",
+-      sessionID: evt.properties.sessionID,
+-    })
+-  })
+-
+-  sdk.event.on(SessionApi.Event.Deleted.type, (evt) => {
+-    if (route.data.type === "session" && route.data.sessionID === evt.properties.info.id) {
+-      route.navigate({ type: "home" })
+-      toast.show({
+-        variant: "info",
+-        message: "The current session was deleted",
+-      })
+-    }
+-  })
+-
+-  sdk.event.on(SessionApi.Event.Error.type, (evt) => {
+-    const error = evt.properties.error
+-    if (error && typeof error === "object" && error.name === "MessageAbortedError") return
+-    const message = (() => {
+-      if (!error) return "An error occurred"
+-
+-      if (typeof error === "object") {
+-        const data = error.data
+-        if ("message" in data && typeof data.message === "string") {
+-          return data.message
+-        }
+-      }
+-      return String(error)
+-    })()
+-
+-    toast.show({
+-      variant: "error",
+-      message,
+-      duration: 5000,
+-    })
+-  })
+-
+-  sdk.event.on(Installation.Event.UpdateAvailable.type, (evt) => {
+-    toast.show({
+-      variant: "info",
+-      title: "Update Available",
+-      message: `OpenCode v${evt.properties.version} is available. Run 'opencode upgrade' to update manually.`,
+-      duration: 10000,
+-    })
+-  })
+-
+-  return (
+-    <box
+-      width={dimensions().width}
+-      height={dimensions().height}
+-      backgroundColor={theme.background}
+-      onMouseDown={(evt) => {
+-        if (!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT) return
+-        if (evt.button !== MouseButton.RIGHT) return
+-
+-        if (!Selection.copy(renderer, toast)) return
+-        evt.preventDefault()
+-        evt.stopPropagation()
+-      }}
+-      onMouseUp={Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT ? undefined : () => Selection.copy(renderer, toast)}
+-    >
+-      <Switch>
+-        <Match when={route.data.type === "home"}>
+-          <Home />
+-        </Match>
+-        <Match when={route.data.type === "session"}>
+-          <Session />
+-        </Match>
+-      </Switch>
+-    </box>
+-  )
++	const route = useRoute()
++	const dimensions = useTerminalDimensions()
++	const renderer = useRenderer()
++	renderer.disableStdoutInterception()
++	const dialog = useDialog()
++	const local = useLocal()
++	const kv = useKV()
++	const command = useCommandDialog()
++	const sdk = useSDK()
++	const toast = useToast()
++	const { theme, mode, setMode } = useTheme()
++	const sync = useSync()
++	const exit = useExit()
++	const promptRef = usePromptRef()
++
++	useKeyboard((evt) => {
++		if (!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT) return
++		if (!renderer.getSelection()) return
++
++		// Windows Terminal-like behavior:
++		// - Ctrl+C copies and dismisses selection
++		// - Esc dismisses selection
++		// - Most other key input dismisses selection and is passed through
++		if (evt.ctrl && evt.name === "c") {
++			if (!Selection.copy(renderer, toast)) {
++				renderer.clearSelection()
++				return
++			}
++
++			evt.preventDefault()
++			evt.stopPropagation()
++			return
++		}
++
++		if (evt.name === "escape") {
++			renderer.clearSelection()
++			evt.preventDefault()
++			evt.stopPropagation()
++			return
++		}
++
++		renderer.clearSelection()
++	})
++
++	// Wire up console copy-to-clipboard via opentui's onCopySelection callback
++	renderer.console.onCopySelection = async (text: string) => {
++		if (!text || text.length === 0) return
++
++		await Clipboard.copy(text)
++			.then(() => toast.show({ message: "Copied to clipboard", variant: "info" }))
++			.catch(toast.error)
++
++		renderer.clearSelection()
++	}
++	const [terminalTitleEnabled, setTerminalTitleEnabled] = createSignal(kv.get("terminal_title_enabled", true))
++
++	createEffect(() => {
++		console.log(JSON.stringify(route.data))
++	})
++
++	// Update terminal window title based on current route and session
++	createEffect(() => {
++		if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
++
++		if (route.data.type === "home") {
++			renderer.setTerminalTitle("OpenCode")
++			return
++		}
++
++		if (route.data.type === "session") {
++			const session = sync.session.get(route.data.sessionID)
++			if (!session || SessionApi.isDefaultTitle(session.title)) {
++				renderer.setTerminalTitle("OpenCode")
++				return
++			}
++
++			// Truncate title to 40 chars max
++			const title = session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title
++			renderer.setTerminalTitle(`OC | ${title}`)
++		}
++	})
++
++	const args = useArgs()
++	onMount(() => {
++		batch(() => {
++			if (args.agent) local.agent.set(args.agent)
++			if (args.model) {
++				const { providerID, modelID } = Provider.parseModel(args.model)
++				if (!providerID || !modelID)
++					return toast.show({
++						variant: "warning",
++						message: `Invalid model format: ${args.model}`,
++						duration: 3000,
++					})
++				local.model.set({ providerID, modelID }, { recent: true })
++			}
++			// Handle --session without --fork immediately (fork is handled in createEffect below)
++			if (args.sessionID && !args.fork) {
++				route.navigate({
++					type: "session",
++					sessionID: args.sessionID,
++				})
++			}
++		})
++	})
++
++	let continued = false
++	createEffect(() => {
++		// When using -c, session list is loaded in blocking phase, so we can navigate at "partial"
++		if (continued || sync.status === "loading" || !args.continue) return
++		const match = sync.data.session
++			.toSorted((a, b) => b.time.updated - a.time.updated)
++			.find((x) => x.parentID === undefined)?.id
++		if (match) {
++			continued = true
++			if (args.fork) {
++				sdk.client.session.fork({ sessionID: match }).then((result) => {
++					if (result.data?.id) {
++						route.navigate({ type: "session", sessionID: result.data.id })
++					} else {
++						toast.show({ message: "Failed to fork session", variant: "error" })
++					}
++				})
++			} else {
++				route.navigate({ type: "session", sessionID: match })
++			}
++		}
++	})
++
++	// Handle --session with --fork: wait for sync to be fully complete before forking
++	// (session list loads in non-blocking phase for --session, so we must wait for "complete"
++	// to avoid a race where reconcile overwrites the newly forked session)
++	let forked = false
++	createEffect(() => {
++		if (forked || sync.status !== "complete" || !args.sessionID || !args.fork) return
++		forked = true
++		sdk.client.session.fork({ sessionID: args.sessionID }).then((result) => {
++			if (result.data?.id) {
++				route.navigate({ type: "session", sessionID: result.data.id })
++			} else {
++				toast.show({ message: "Failed to fork session", variant: "error" })
++			}
++		})
++	})
++
++	createEffect(
++		on(
++			() => sync.status === "complete" && sync.data.provider.length === 0,
++			(isEmpty, wasEmpty) => {
++				// only trigger when we transition into an empty-provider state
++				if (!isEmpty || wasEmpty) return
++				dialog.replace(() => <DialogProviderList />)
++			},
++		),
++	)
++
++	const connected = useConnected()
++	command.register(() => [
++		{
++			title: "Switch session",
++			value: "session.list",
++			keybind: "session_list",
++			category: "Session",
++			suggested: sync.data.session.length > 0,
++			slash: {
++				name: "sessions",
++				aliases: ["resume", "continue"],
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogSessionList />)
++			},
++		},
++		{
++			title: "New session",
++			suggested: route.data.type === "session",
++			value: "session.new",
++			keybind: "session_new",
++			category: "Session",
++			slash: {
++				name: "new",
++				aliases: ["clear"],
++			},
++			onSelect: () => {
++				const current = promptRef.current
++				// Don't require focus - if there's any text, preserve it
++				const currentPrompt = current?.current?.input ? current.current : undefined
++				route.navigate({
++					type: "home",
++					initialPrompt: currentPrompt,
++				})
++				dialog.clear()
++			},
++		},
++		{
++			title: "Switch model",
++			value: "model.list",
++			keybind: "model_list",
++			suggested: true,
++			category: "Agent",
++			slash: {
++				name: "models",
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogModel />)
++			},
++		},
++		{
++			title: "Model cycle",
++			value: "model.cycle_recent",
++			keybind: "model_cycle_recent",
++			category: "Agent",
++			hidden: true,
++			onSelect: () => {
++				local.model.cycle(1)
++			},
++		},
++		{
++			title: "Model cycle reverse",
++			value: "model.cycle_recent_reverse",
++			keybind: "model_cycle_recent_reverse",
++			category: "Agent",
++			hidden: true,
++			onSelect: () => {
++				local.model.cycle(-1)
++			},
++		},
++		{
++			title: "Favorite cycle",
++			value: "model.cycle_favorite",
++			keybind: "model_cycle_favorite",
++			category: "Agent",
++			hidden: true,
++			onSelect: () => {
++				local.model.cycleFavorite(1)
++			},
++		},
++		{
++			title: "Favorite cycle reverse",
++			value: "model.cycle_favorite_reverse",
++			keybind: "model_cycle_favorite_reverse",
++			category: "Agent",
++			hidden: true,
++			onSelect: () => {
++				local.model.cycleFavorite(-1)
++			},
++		},
++		{
++			title: "Switch agent",
++			value: "agent.list",
++			keybind: "agent_list",
++			category: "Agent",
++			slash: {
++				name: "agents",
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogAgent />)
++			},
++		},
++		{
++			title: "Toggle MCPs",
++			value: "mcp.list",
++			category: "Agent",
++			slash: {
++				name: "mcps",
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogMcp />)
++			},
++		},
++		{
++			title: "Agent cycle",
++			value: "agent.cycle",
++			keybind: "agent_cycle",
++			category: "Agent",
++			hidden: true,
++			onSelect: () => {
++				local.agent.move(1)
++			},
++		},
++		{
++			title: "Variant cycle",
++			value: "variant.cycle",
++			keybind: "variant_cycle",
++			category: "Agent",
++			hidden: true,
++			onSelect: () => {
++				local.model.variant.cycle()
++			},
++		},
++		{
++			title: "Agent cycle reverse",
++			value: "agent.cycle.reverse",
++			keybind: "agent_cycle_reverse",
++			category: "Agent",
++			hidden: true,
++			onSelect: () => {
++				local.agent.move(-1)
++			},
++		},
++		{
++			title: "Connect provider",
++			value: "provider.connect",
++			suggested: !connected(),
++			slash: {
++				name: "connect",
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogProviderList />)
++			},
++			category: "Provider",
++		},
++		{
++			title: "View status",
++			keybind: "status_view",
++			value: "opencode.status",
++			slash: {
++				name: "status",
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogStatus />)
++			},
++			category: "System",
++		},
++		{
++			title: "Switch theme",
++			value: "theme.switch",
++			keybind: "theme_list",
++			slash: {
++				name: "themes",
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogThemeList />)
++			},
++			category: "System",
++		},
++		{
++			title: "Toggle appearance",
++			value: "theme.switch_mode",
++			onSelect: (dialog) => {
++				setMode(mode() === "dark" ? "light" : "dark")
++				dialog.clear()
++			},
++			category: "System",
++		},
++		{
++			title: "Help",
++			value: "help.show",
++			slash: {
++				name: "help",
++			},
++			onSelect: () => {
++				dialog.replace(() => <DialogHelp />)
++			},
++			category: "System",
++		},
++		{
++			title: "Open docs",
++			value: "docs.open",
++			onSelect: () => {
++				open("https://opencode.ai/docs").catch(() => { })
++				dialog.clear()
++			},
++			category: "System",
++		},
++		{
++			title: "Exit the app",
++			value: "app.exit",
++			slash: {
++				name: "exit",
++				aliases: ["quit", "q"],
++			},
++			onSelect: () => exit(),
++			category: "System",
++		},
++		{
++			title: "Toggle debug panel",
++			category: "System",
++			value: "app.debug",
++			onSelect: (dialog) => {
++				renderer.toggleDebugOverlay()
++				dialog.clear()
++			},
++		},
++		{
++			title: "Toggle console",
++			category: "System",
++			value: "app.console",
++			onSelect: (dialog) => {
++				renderer.console.toggle()
++				dialog.clear()
++			},
++		},
++		{
++			title: "Write heap snapshot",
++			category: "System",
++			value: "app.heap_snapshot",
++			onSelect: (dialog) => {
++				const path = writeHeapSnapshot()
++				toast.show({
++					variant: "info",
++					message: `Heap snapshot written to ${path}`,
++					duration: 5000,
++				})
++				dialog.clear()
++			},
++		},
++		{
++			title: "Suspend terminal",
++			value: "terminal.suspend",
++			keybind: "terminal_suspend",
++			category: "System",
++			hidden: true,
++			onSelect: () => {
++				process.once("SIGCONT", () => {
++					renderer.resume()
++				})
++
++				renderer.suspend()
++				// pid=0 means send the signal to all processes in the process group
++				process.kill(0, "SIGTSTP")
++			},
++		},
++		{
++			title: terminalTitleEnabled() ? "Disable terminal title" : "Enable terminal title",
++			value: "terminal.title.toggle",
++			keybind: "terminal_title_toggle",
++			category: "System",
++			onSelect: (dialog) => {
++				setTerminalTitleEnabled((prev) => {
++					const next = !prev
++					kv.set("terminal_title_enabled", next)
++					if (!next) renderer.setTerminalTitle("")
++					return next
++				})
++				dialog.clear()
++			},
++		},
++		{
++			title: kv.get("animations_enabled", true) ? "Disable animations" : "Enable animations",
++			value: "app.toggle.animations",
++			category: "System",
++			onSelect: (dialog) => {
++				kv.set("animations_enabled", !kv.get("animations_enabled", true))
++				dialog.clear()
++			},
++		},
++		{
++			title: kv.get("diff_wrap_mode", "word") === "word" ? "Disable diff wrapping" : "Enable diff wrapping",
++			value: "app.toggle.diffwrap",
++			category: "System",
++			onSelect: (dialog) => {
++				const current = kv.get("diff_wrap_mode", "word")
++				kv.set("diff_wrap_mode", current === "word" ? "none" : "word")
++				dialog.clear()
++			},
++		},
++	])
++
++	createEffect(() => {
++		const currentModel = local.model.current()
++		if (!currentModel) return
++		if (currentModel.providerID === "openrouter" && !kv.get("openrouter_warning", false)) {
++			untrack(() => {
++				DialogAlert.show(
++					dialog,
++					"Warning",
++					"While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out OpenCode Zen\nhttps://opencode.ai/zen",
++				).then(() => kv.set("openrouter_warning", true))
++			})
++		}
++	})
++
++	sdk.event.on(TuiEvent.CommandExecute.type, (evt) => {
++		command.trigger(evt.properties.command)
++	})
++
++	sdk.event.on(TuiEvent.ToastShow.type, (evt) => {
++		toast.show({
++			title: evt.properties.title,
++			message: evt.properties.message,
++			variant: evt.properties.variant,
++			duration: evt.properties.duration,
++		})
++	})
++
++	sdk.event.on(TuiEvent.SessionSelect.type, (evt) => {
++		route.navigate({
++			type: "session",
++			sessionID: evt.properties.sessionID,
++		})
++	})
++
++	sdk.event.on(SessionApi.Event.Deleted.type, (evt) => {
++		if (route.data.type === "session" && route.data.sessionID === evt.properties.info.id) {
++			route.navigate({ type: "home" })
++			toast.show({
++				variant: "info",
++				message: "The current session was deleted",
++			})
++		}
++	})
++
++	sdk.event.on(SessionApi.Event.Error.type, (evt) => {
++		const error = evt.properties.error
++		if (error && typeof error === "object" && error.name === "MessageAbortedError") return
++		const message = (() => {
++			if (!error) return "An error occurred"
++
++			if (typeof error === "object") {
++				const data = error.data
++				if ("message" in data && typeof data.message === "string") {
++					return data.message
++				}
++			}
++			return String(error)
++		})()
++
++		toast.show({
++			variant: "error",
++			message,
++			duration: 5000,
++		})
++	})
++
++	sdk.event.on(Installation.Event.UpdateAvailable.type, (evt) => {
++		toast.show({
++			variant: "info",
++			title: "Update Available",
++			message: `OpenCode v${evt.properties.version} is available. Run 'opencode upgrade' to update manually.`,
++			duration: 10000,
++		})
++	})
++
++	return (
++		<box
++			width={dimensions().width}
++			height={dimensions().height}
++			backgroundColor={theme.background}
++			onMouseDown={(evt) => {
++				if (!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT) return
++				if (evt.button !== MouseButton.RIGHT) return
++
++				if (!Selection.copy(renderer, toast)) return
++				evt.preventDefault()
++				evt.stopPropagation()
++			}}
++			onMouseUp={Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT ? undefined : () => Selection.copy(renderer, toast)}
++		>
++			<Switch>
++				<Match when={route.data.type === "home"}>
++					<Home />
++				</Match>
++				<Match when={route.data.type === "session"}>
++					<Session />
++				</Match>
++			</Switch>
++		</box>
++	)
+ }
+ 
+ function ErrorComponent(props: {
+-  error: Error
+-  reset: () => void
+-  onExit: () => Promise<void>
+-  mode?: "dark" | "light"
++	error: Error
++	reset: () => void
++	onExit: () => Promise<void>
++	mode?: "dark" | "light"
+ }) {
+-  const term = useTerminalDimensions()
+-  const renderer = useRenderer()
+-
+-  const handleExit = async () => {
+-    renderer.setTerminalTitle("")
+-    renderer.destroy()
+-    win32FlushInputBuffer()
+-    await props.onExit()
+-  }
+-
+-  useKeyboard((evt) => {
+-    if (evt.ctrl && evt.name === "c") {
+-      handleExit()
+-    }
+-  })
+-  const [copied, setCopied] = createSignal(false)
+-
+-  const issueURL = new URL("https://github.com/anomalyco/opencode/issues/new?template=bug-report.yml")
+-
+-  // Choose safe fallback colors per mode since theme context may not be available
+-  const isLight = props.mode === "light"
+-  const colors = {
+-    bg: isLight ? "#ffffff" : "#0a0a0a",
+-    text: isLight ? "#1a1a1a" : "#eeeeee",
+-    muted: isLight ? "#8a8a8a" : "#808080",
+-    primary: isLight ? "#3b7dd8" : "#fab283",
+-  }
+-
+-  if (props.error.message) {
+-    issueURL.searchParams.set("title", `opentui: fatal: ${props.error.message}`)
+-  }
+-
+-  if (props.error.stack) {
+-    issueURL.searchParams.set(
+-      "description",
+-      "```\n" + props.error.stack.substring(0, 6000 - issueURL.toString().length) + "...\n```",
+-    )
+-  }
+-
+-  issueURL.searchParams.set("opencode-version", Installation.VERSION)
+-
+-  const copyIssueURL = () => {
+-    Clipboard.copy(issueURL.toString()).then(() => {
+-      setCopied(true)
+-    })
+-  }
+-
+-  return (
+-    <box flexDirection="column" gap={1} backgroundColor={colors.bg}>
+-      <box flexDirection="row" gap={1} alignItems="center">
+-        <text attributes={TextAttributes.BOLD} fg={colors.text}>
+-          Please report an issue.
+-        </text>
+-        <box onMouseUp={copyIssueURL} backgroundColor={colors.primary} padding={1}>
+-          <text attributes={TextAttributes.BOLD} fg={colors.bg}>
+-            Copy issue URL (exception info pre-filled)
+-          </text>
+-        </box>
+-        {copied() && <text fg={colors.muted}>Successfully copied</text>}
+-      </box>
+-      <box flexDirection="row" gap={2} alignItems="center">
+-        <text fg={colors.text}>A fatal error occurred!</text>
+-        <box onMouseUp={props.reset} backgroundColor={colors.primary} padding={1}>
+-          <text fg={colors.bg}>Reset TUI</text>
+-        </box>
+-        <box onMouseUp={handleExit} backgroundColor={colors.primary} padding={1}>
+-          <text fg={colors.bg}>Exit</text>
+-        </box>
+-      </box>
+-      <scrollbox height={Math.floor(term().height * 0.7)}>
+-        <text fg={colors.muted}>{props.error.stack}</text>
+-      </scrollbox>
+-      <text fg={colors.text}>{props.error.message}</text>
+-    </box>
+-  )
++	const term = useTerminalDimensions()
++	const renderer = useRenderer()
++
++	const handleExit = async () => {
++		renderer.setTerminalTitle("")
++		renderer.destroy()
++		win32FlushInputBuffer()
++		await props.onExit()
++	}
++
++	useKeyboard((evt) => {
++		if (evt.ctrl && evt.name === "c") {
++			handleExit()
++		}
++	})
++	const [copied, setCopied] = createSignal(false)
++
++	const issueURL = new URL("https://github.com/anomalyco/opencode/issues/new?template=bug-report.yml")
++
++	// Choose safe fallback colors per mode since theme context may not be available
++	const isLight = props.mode === "light"
++	const colors = {
++		bg: isLight ? "#ffffff" : "#0a0a0a",
++		text: isLight ? "#1a1a1a" : "#eeeeee",
++		muted: isLight ? "#8a8a8a" : "#808080",
++		primary: isLight ? "#3b7dd8" : "#fab283",
++	}
++
++	if (props.error.message) {
++		issueURL.searchParams.set("title", `opentui: fatal: ${props.error.message}`)
++	}
++
++	if (props.error.stack) {
++		issueURL.searchParams.set(
++			"description",
++			"```\n" + props.error.stack.substring(0, 6000 - issueURL.toString().length) + "...\n```",
++		)
++	}
++
++	issueURL.searchParams.set("opencode-version", Installation.VERSION)
++
++	const copyIssueURL = () => {
++		Clipboard.copy(issueURL.toString()).then(() => {
++			setCopied(true)
++		})
++	}
++
++	return (
++		<box flexDirection="column" gap={1} backgroundColor={colors.bg}>
++			<box flexDirection="row" gap={1} alignItems="center">
++				<text attributes={TextAttributes.BOLD} fg={colors.text}>
++					Please report an issue.
++				</text>
++				<box onMouseUp={copyIssueURL} backgroundColor={colors.primary} padding={1}>
++					<text attributes={TextAttributes.BOLD} fg={colors.bg}>
++						Copy issue URL (exception info pre-filled)
++					</text>
++				</box>
++				{copied() && <text fg={colors.muted}>Successfully copied</text>}
++			</box>
++			<box flexDirection="row" gap={2} alignItems="center">
++				<text fg={colors.text}>A fatal error occurred!</text>
++				<box onMouseUp={props.reset} backgroundColor={colors.primary} padding={1}>
++					<text fg={colors.bg}>Reset TUI</text>
++				</box>
++				<box onMouseUp={handleExit} backgroundColor={colors.primary} padding={1}>
++					<text fg={colors.bg}>Exit</text>
++				</box>
++			</box>
++			<scrollbox height={Math.floor(term().height * 0.7)}>
++				<text fg={colors.muted}>{props.error.stack}</text>
++			</scrollbox>
++			<text fg={colors.text}>{props.error.message}</text>
++		</box>
++	)
+ }
+diff --git a/packages/opencode/src/cli/cmd/tui/util/clipboard.ts b/packages/opencode/src/cli/cmd/tui/util/clipboard.ts
+index 7d1aad3a8..43a9ceafa 100644
+--- a/packages/opencode/src/cli/cmd/tui/util/clipboard.ts
++++ b/packages/opencode/src/cli/cmd/tui/util/clipboard.ts
+@@ -84,6 +84,21 @@ export namespace Clipboard {
+     }
+ 
+     if (os === "linux") {
++      // WSL2: xclip writes to X11 inside WSL, not to Windows clipboard.
++      // Use clip.exe to bridge clipboard to the Windows host.
++      if (release().includes("WSL") && Bun.which("clip.exe")) {
++        console.log("clipboard: using clip.exe (WSL)")
++        return async (text: string) => {
++          const proc = Bun.spawn(["clip.exe"], {
++            stdin: "pipe",
++            stdout: "ignore",
++            stderr: "ignore",
++          })
++          proc.stdin.write(text)
++          proc.stdin.end()
++          await proc.exited.catch(() => {})
++        }
++      }
+       if (process.env["WAYLAND_DISPLAY"] && Bun.which("wl-copy")) {
+         console.log("clipboard: using wl-copy")
+         return async (text: string) => {

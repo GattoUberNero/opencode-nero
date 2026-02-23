@@ -102,11 +102,12 @@ async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string):
     }
 
     if (authorize.method === "code") {
-      const code = await prompts.text({
-        message: "Paste the authorization code here: ",
+      const raw = await prompts.text({
+        message: "Paste the authorization code (or callback URL) here: ",
         validate: (x) => (x && x.length > 0 ? undefined : "Required"),
       })
-      if (prompts.isCancel(code)) throw new UI.CancelledError()
+      if (prompts.isCancel(raw)) throw new UI.CancelledError()
+      const code = extractOAuthAuthorizationCode(String(raw))
       const result = await authorize.callback(code)
       if (result.type === "failed") {
         prompts.log.error("Failed to authorize")
@@ -157,6 +158,67 @@ async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string):
   }
 
   return false
+}
+
+/**
+ * Extract an OAuth `code` from a pasted callback URL (or return raw input).
+ * Useful when the local callback listener can't start and the user pastes the full URL.
+ */
+export function extractOAuthAuthorizationCode(input: string): string {
+  const raw = (input ?? "").trim()
+  if (!raw) return raw
+
+  const candidates: string[] = [raw]
+
+  // Try percent-decoding a few times to handle nested `redirect=` values.
+  let decoded = raw
+  for (let i = 0; i < 3; i++) {
+    try {
+      const next = decodeURIComponent(decoded)
+      if (!next || next === decoded) break
+      candidates.push(next)
+      decoded = next
+    } catch {
+      break
+    }
+  }
+
+  const extractFromText = (text: string): string | null => {
+    const match = text.match(/(?:^|[?&])code=([^&#\s]+)/)
+    if (!match) return null
+
+    const value = match[1]
+    try {
+      return decodeURIComponent(value)
+    } catch {
+      return value
+    }
+  }
+
+  for (const text of candidates) {
+    const found = extractFromText(text)
+    if (found && found.trim()) return found.trim()
+  }
+
+  // Parse URL-like tokens as a fallback.
+  const urlTokens = raw.match(/https?:\/\/[^\s]+/g) ?? []
+  for (const token of urlTokens) {
+    try {
+      const url = new URL(token)
+      const code = url.searchParams.get("code")
+      if (code && code.trim()) return code.trim()
+
+      const redirect = url.searchParams.get("redirect")
+      if (redirect) {
+        const found = extractFromText(redirect)
+        if (found && found.trim()) return found.trim()
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return raw
 }
 
 /**

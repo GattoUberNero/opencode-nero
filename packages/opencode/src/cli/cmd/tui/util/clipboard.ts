@@ -84,6 +84,21 @@ export namespace Clipboard {
     }
 
     if (os === "linux") {
+      // WSL2: xclip writes to X11 inside WSL, not to Windows clipboard.
+      // Use clip.exe to bridge clipboard to the Windows host.
+      if (release().includes("WSL") && Bun.which("clip.exe")) {
+        console.log("clipboard: using clip.exe (WSL)")
+        return async (text: string) => {
+          const proc = Bun.spawn(["clip.exe"], {
+            stdin: "pipe",
+            stdout: "ignore",
+            stderr: "ignore",
+          })
+          proc.stdin.write(text)
+          proc.stdin.end()
+          await proc.exited.catch(() => {})
+        }
+      }
       if (process.env["WAYLAND_DISPLAY"] && Bun.which("wl-copy")) {
         console.log("clipboard: using wl-copy")
         return async (text: string) => {
